@@ -1,0 +1,31 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environment
+.venv/
+venv/
+
+# Secrets and local settings
+.env
+.env.*
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Project data and generated artifacts
+data/raw/
+data/processed/
+artifacts/
+mlruns/
+logs/
+
+# IDE
+.idea/
+.vscode/
