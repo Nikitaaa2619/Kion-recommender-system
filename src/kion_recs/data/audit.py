@@ -53,6 +53,25 @@ def main() -> None:
         f"{interactions['last_watch_dt'].max().date()}"
     )
 
+    missing_values = interactions.isna().sum()
+    duplicate_pairs = interactions.duplicated(subset=["user_id", "item_id"]).sum()
+    invalid_watched_pct = (
+        ~interactions["watched_pct"].dropna().between(0, 100)
+    ).sum()
+    non_positive_duration = (interactions["total_dur"] <= 0).sum()
+
+    user_activity = interactions.groupby("user_id").size()
+
+    print("\nMissing values:")
+    print(missing_values.to_string())
+    print(f"\nDuplicate user-item pairs: {duplicate_pairs:,}")
+    print(f"Watched percentages outside 0–100: {invalid_watched_pct:,}")
+    print(f"Non-positive durations: {non_positive_duration:,}")
+    print("\nInteractions per user:")
+    print(f"Median: {user_activity.median():.0f}")
+    print(f"95th percentile: {user_activity.quantile(0.95):.0f}")
+    print(f"Maximum: {user_activity.max():,}")
+
 
 if __name__ == "__main__":
     main()
