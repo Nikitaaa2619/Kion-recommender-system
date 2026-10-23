@@ -1,6 +1,7 @@
 import pandas as pd
 
-from kion_recs.metrics import recall_at_k
+from kion_recs.coverage import catalog_coverage
+from kion_recs.metrics import average_precision_at_k, ndcg_at_k, recall_at_k
 from kion_recs.models.popularity import fit_popularity
 
 
@@ -18,13 +19,16 @@ def main() -> None:
 
     popularity = fit_popularity(train)
     ranked_items = popularity["item_id"].tolist()
+    catalog_items = set(ranked_items)
 
     train_history = train.groupby("user_id")["item_id"].agg(set).to_dict()
     validation_history = validation.groupby("user_id")["item_id"].agg(set).to_dict()
 
-    scores = []
-    warm_scores = []
-    cold_scores = []
+    if not validation_history:
+        raise ValueError("Validation must contain at least one user")
+
+    results = []
+    all_recommended_items = set()
 
     print(f"Evaluating {len(validation_history):,} users...")
 
@@ -39,30 +43,46 @@ def main() -> None:
             if len(recommendations) == k:
                 break
 
-        score = recall_at_k(recommendations, relevant_items, k=k)
-        scores.append(score)
+        all_recommended_items.update(recommendations)
 
-        if seen_items:
-            warm_scores.append(score)
-        else:
-            cold_scores.append(score)
+        results.append(
+            {
+                "user_id": user_id,
+                "group": "warm" if seen_items else "cold",
+                "recall": recall_at_k(recommendations, relevant_items, k=k),
+                "ap": average_precision_at_k(
+                    recommendations,
+                    relevant_items,
+                    k=k,
+                ),
+                "ndcg": ndcg_at_k(recommendations, relevant_items, k=k),
+            }
+        )
 
-    if not scores:
-        raise ValueError("Validation must contain at least one user")
+    results_table = pd.DataFrame(results)
 
-    mean_recall = sum(scores) / len(scores)
-
-    print(f"Users evaluated: {len(scores):,}")
-    print(f"Cold-start users: {len(cold_scores):,}")
-    print(f"Recall@{k}: {mean_recall:.6f}")
-
-    for group_name, group_scores in [
-        ("Warm", warm_scores),
-        ("Cold", cold_scores),
+    for group_name, group_results in [
+        ("All", results_table),
+        ("Warm", results_table.loc[results_table["group"] == "warm"]),
+        ("Cold", results_table.loc[results_table["group"] == "cold"]),
     ]:
-        if group_scores:
-            group_mean = sum(group_scores) / len(group_scores)
-            print(f"{group_name} Recall@{k}: {group_mean:.6f} ({len(group_scores):,} users)")
+        if group_results.empty:
+            continue
+
+        mean_recall = group_results["recall"].mean()
+        mean_ap = group_results["ap"].mean()
+        mean_ndcg = group_results["ndcg"].mean()
+
+        print(f"\n{group_name}: {len(group_results):,} users")
+        print(f"Recall@{k}: {mean_recall:.6f}")
+        print(f"MAP@{k}: {mean_ap:.6f}")
+        print(f"NDCG@{k}: {mean_ndcg:.6f}")
+
+    coverage = catalog_coverage(all_recommended_items, catalog_items)
+
+    print(f"\nRecommended unique items: {len(all_recommended_items):,}")
+    print(f"Train catalog items: {len(catalog_items):,}")
+    print(f"Coverage@{k}: {coverage:.6f} ({coverage:.2%})")
 
 
 if __name__ == "__main__":
