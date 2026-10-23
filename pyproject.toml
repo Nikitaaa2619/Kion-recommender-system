@@ -5,6 +5,7 @@ description = "Production-oriented recommender system based on the KION dataset"
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
 dependencies = [
+    "implicit>=0.7.3",
     "numpy>=2.4.6",
     "pandas>=3.0.6",
     "pyarrow>=26.0.0",
