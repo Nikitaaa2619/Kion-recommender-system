@@ -3,11 +3,10 @@ from pathlib import Path
 import pandas as pd
 
 
-def add_history_features(
-    candidates: pd.DataFrame,
+def build_history_feature_tables(
     history: pd.DataFrame,
     cutoff: str,
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     boundary = pd.Timestamp(cutoff)
     dates = history["last_watch_dt"]
 
@@ -41,6 +40,22 @@ def add_history_features(
         .reset_index()
     )
 
+    item_features = item_features.merge(
+        recent_item_features,
+        on="item_id",
+        how="left",
+        sort=False,
+        validate="one_to_one",
+    )
+
+    return user_features, item_features
+
+
+def attach_history_features(
+    candidates: pd.DataFrame,
+    user_features: pd.DataFrame,
+    item_features: pd.DataFrame,
+) -> pd.DataFrame:
     result = candidates.merge(
         user_features,
         on="user_id",
@@ -55,13 +70,6 @@ def add_history_features(
         sort=False,
         validate="many_to_one",
     )
-    result = result.merge(
-        recent_item_features,
-        on="item_id",
-        how="left",
-        sort=False,
-        validate="many_to_one",
-    )
 
     result["is_cold_user"] = result["user_n_items"].isna().astype("int8")
 
@@ -71,6 +79,23 @@ def add_history_features(
     result["user_days_since_last_watch"] = result["user_days_since_last_watch"].astype("float32")
 
     return result
+
+
+def add_history_features(
+    candidates: pd.DataFrame,
+    history: pd.DataFrame,
+    cutoff: str,
+) -> pd.DataFrame:
+    user_features, item_features = build_history_feature_tables(
+        history,
+        cutoff=cutoff,
+    )
+
+    return attach_history_features(
+        candidates,
+        user_features,
+        item_features,
+    )
 
 
 def main() -> None:
